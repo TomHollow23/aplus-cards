@@ -56,13 +56,14 @@
     .hint { font-size: 0.75rem; color: var(--text-muted); text-align: center; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 4px; }
 
     .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 560px; }
-    .btn { padding: 14px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; color: #fff; font-size: 0.9rem; transition: transform 0.1s, box-shadow 0.2s, filter 0.2s; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-    .btn:active { transform: scale(0.97); }
+    .btn { padding: 14px; border: 2px solid transparent; border-radius: 12px; font-weight: 700; cursor: pointer; color: #fff; font-size: 0.9rem; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 2px; opacity: 0.8; }
+    .btn:hover { opacity: 1; }
+    .btn.active-rating { opacity: 1; border-color: #ffffff; box-shadow: 0 0 15px rgba(255,255,255,0.4); transform: scale(1.03); }
     .btn-key { font-size: 0.65rem; opacity: 0.7; font-weight: 500; }
 
-    .btn-hard { background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3); }
-    .btn-good { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3); }
-    .btn-easy { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3); }
+    .btn-hard { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn-good { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .btn-easy { background: linear-gradient(135deg, #10b981, #059669); }
 
     .nav { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 560px; margin-top: 16px; }
     .nav-btn { background: #1e293b; border: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 8px 16px; border-radius: 10px; transition: all 0.2s; }
@@ -117,15 +118,15 @@
           <span class="tag" style="color: var(--accent); background: rgba(56, 189, 248, 0.1);">Answer Key</span>
         </div>
         <p class="card-text" id="card-back-text">Answer</p>
-        <p class="hint">Rate confidence to advance</p>
+        <p class="hint">Rate confidence below</p>
       </div>
     </div>
   </div>
 
   <div class="controls">
-    <button class="btn btn-hard" onclick="grade('Hard')">Hard <span class="btn-key">[Key 1]</span></button>
-    <button class="btn btn-good" onclick="grade('Good')">Good <span class="btn-key">[Key 2]</span></button>
-    <button class="btn btn-easy" onclick="grade('Easy')">Easy <span class="btn-key">[Key 3]</span></button>
+    <button class="btn btn-hard" id="btn-rating-Hard" onclick="grade('Hard')">Hard <span class="btn-key">[Key 1]</span></button>
+    <button class="btn btn-good" id="btn-rating-Good" onclick="grade('Good')">Good <span class="btn-key">[Key 2]</span></button>
+    <button class="btn btn-easy" id="btn-rating-Easy" onclick="grade('Easy')">Easy <span class="btn-key">[Key 3]</span></button>
   </div>
 
   <div class="nav">
@@ -151,7 +152,7 @@
 
     function makeCards(domainId, entries) {
       const dom = domains.find(d => d.id === domainId);
-      return entries.map(([q, a]) => ({ domainId, exam: dom.exam, catName: dom.name, q, a }));
+      return entries.map(([q, a], idx) => ({ id: `${domainId}-${idx}`, domainId, exam: dom.exam, catName: dom.name, q, a }));
     }
 
     const deck = [
@@ -421,6 +422,16 @@
       document.getElementById("counter").innerText = `${idx + 1} / ${activeDeck.length}`;
       document.getElementById("card").classList.remove("flipped");
 
+      // Highlight saved rating button if existing
+      const currentRating = grades[item.id];
+      ['Hard', 'Good', 'Easy'].forEach(r => {
+        const btn = document.getElementById(`btn-rating-${r}`);
+        if (btn) {
+          if (r === currentRating) btn.classList.add('active-rating');
+          else btn.classList.remove('active-rating');
+        }
+      });
+
       localStorage.setItem('aplus_idx', idx);
       updateStats();
     }
@@ -438,8 +449,10 @@
     }
 
     function grade(val) {
-      grades[activeDeck[idx].q] = val;
+      const item = activeDeck[idx];
+      grades[item.id] = val;
       localStorage.setItem('aplus_grades', JSON.stringify(grades));
+      renderCard();
       nextCard();
     }
 
@@ -452,11 +465,18 @@
     }
 
     function updateStats() {
-      const easyCount = Object.values(grades).filter(g => g === "Easy").length;
-      const goodCount = Object.values(grades).filter(g => g === "Good").length;
-      const hardCount = Object.values(grades).filter(g => g === "Hard").length;
-      const ratedTotal = easyCount + goodCount + hardCount;
+      let easyCount = 0;
+      let goodCount = 0;
+      let hardCount = 0;
 
+      deck.forEach(c => {
+        const g = grades[c.id];
+        if (g === "Easy") easyCount++;
+        else if (g === "Good") goodCount++;
+        else if (g === "Hard") hardCount++;
+      });
+
+      const ratedTotal = easyCount + goodCount + hardCount;
       const totalDeckSize = deck.length;
       const masteredPct = Math.round(((easyCount + (goodCount * 0.5)) / totalDeckSize) * 100);
 
